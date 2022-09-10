@@ -1,21 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CellDetails, createBoard, revealed } from 'src/utils';
 import { Cell } from './components';
 import styled from 'styled-components';
-import { Container } from 'src/components';
+import { Button, Container, Heading } from 'src/components';
+import { useBoardSizeState } from 'src/hooks';
+import { useNavigate } from 'react-router-dom';
+import { pageUrl } from 'src/const';
+
+const ContainerStyled = styled(Container)`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+`;
 
 const Row = styled.div`
   display: flex;
   flex-direction: row;
   width: fit-content;
   color: #f7cf06;
-`;
-
-const Heading = styled.div`
-  padding-top: 10px;
-  text-align: center;
-  color: #f7cf06;
-  font-size: 35px;
 `;
 
 const Aligned = styled.div`
@@ -25,66 +28,85 @@ const Aligned = styled.div`
   align-items: center;
 `;
 
+const ButtonStyled = styled(Button)`
+  min-width: 200px;
+  margin-bottom: 30px;
+`;
+
+const SubHeading = styled.span`
+  font-size: 16px;
+  font-weight: bold;
+  color: #f7cf06;
+`;
+
 function Board() {
-  const [grid, setGrid] = useState<CellDetails[][]>([]);
+  const [board, setBoard] = useState<CellDetails[][]>([]);
+  const [explode, setExplode] = useState(false);
   const [nonMineCount, setNonMineCount] = useState(0);
   const [mineLocation, setMineLocation] = useState<[x: number, y: number][]>([]);
+  const [boardSize] = useBoardSizeState();
+
+  const restartBoard = useCallback(() => {
+    const newBoard = createBoard(boardSize.rows, boardSize.cols, boardSize.mines);
+    setNonMineCount(boardSize.rows * boardSize.cols - boardSize.mines);
+    setMineLocation(newBoard.mineLocation);
+    setBoard(newBoard.board);
+    setExplode(false);
+  }, [boardSize]);
 
   useEffect(() => {
-    freshBoard();
-  }, []);
+    restartBoard();
+  }, [restartBoard]);
 
-  // Making freshboard at start
-  const freshBoard = () => {
-    const newBoard = createBoard(10, 10, 20);
-    setNonMineCount(10 * 10 - 20);
-    setMineLocation(newBoard.mineLocation);
-    setGrid(newBoard.board);
-  };
+  const navigate = useNavigate();
 
-  const newFresh = () => {
-    freshBoard();
-  };
-
-  const revealCell = (x: number, y: number) => {
-    let newGrid = JSON.parse(JSON.stringify(grid));
-    if (newGrid[x][y].value === 'X') {
-      for (let i = 0; i < mineLocation.length; i++) {
-        newGrid[mineLocation[i][0]][mineLocation[i][1]].revealed = true;
+  const revealCell = useCallback(
+    (x: number, y: number) => {
+      let newBoard = [...board];
+      if (newBoard[x][y].value === 'X' || nonMineCount === 0) {
+        for (let i = 0; i < mineLocation.length; i++) {
+          newBoard[mineLocation[i][0]][mineLocation[i][1]].revealed = true;
+        }
+        setBoard(newBoard);
+        setExplode(true);
       }
-      setGrid(newGrid);
-      setTimeout(newFresh, 500);
-    }
-    if (nonMineCount === 0) {
-      setTimeout(newFresh, 500);
-    } else {
-      let revealedBoard = revealed(newGrid, x, y, nonMineCount);
-      setGrid(revealedBoard.arr);
+      let revealedBoard = revealed(newBoard, x, y, nonMineCount);
+      setBoard(revealedBoard.arr);
       setNonMineCount(revealedBoard.newNonMines);
-    }
-  };
+    },
+    [board, mineLocation, nonMineCount],
+  );
+
+  const onSetupBoardClick = () => navigate(pageUrl.setupSession);
+
+  const onRestartClick = () => restartBoard();
+
+  const headingString = explode
+    ? 'Oooops... Too bad!'
+    : nonMineCount === 0
+    ? '!!! Victory !!!'
+    : 'MineSweeper';
 
   return (
-    <Container>
-      <Heading>
-        <h1>MineSweeper</h1>
-      </Heading>
+    <ContainerStyled>
+      <Heading>{headingString}</Heading>
+      <SubHeading>Mines: {boardSize.mines}</SubHeading>
       <Aligned>
         <div>
-          <div>
-            {grid.map((singleRow, index1) => {
-              return (
-                <Row key={index1}>
-                  {singleRow.map((singleCol, index2) => {
-                    return <Cell details={singleCol} key={index2} revealCell={revealCell} />;
-                  })}
-                </Row>
-              );
-            })}
-          </div>
+          {board.map((singleRow, index1) => {
+            return (
+              <Row key={index1}>
+                {singleRow.map((singleCol, index2) => {
+                  return <Cell details={singleCol} key={index2} revealCell={revealCell} />;
+                })}
+              </Row>
+            );
+          })}
         </div>
       </Aligned>
-    </Container>
+      <ButtonStyled onClick={onRestartClick}>Restart</ButtonStyled>
+      <ButtonStyled onClick={onSetupBoardClick}>Setup the board size</ButtonStyled>
+    </ContainerStyled>
   );
 }
 
