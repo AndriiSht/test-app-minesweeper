@@ -1,4 +1,7 @@
+const home = '/test-app-minesweeper';
+
 export const pageUrl = {
-  session: '/session',
-  setupSession: '/setup-session',
+  home: `${home}/test-app-minesweeper`,
+  session: `${home}/session`,
+  setupSession: `${home}/setup-session`,
 };
